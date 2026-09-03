@@ -1,0 +1,109 @@
+name: Build binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.os_name }}-${{ matrix.arch_name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Unlike Go, Rust cannot link a macOS or Windows binary from Linux,
+          # so each target builds on its own runner instead of cross-compiling.
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            os_name: linux
+            arch_name: amd64
+            binary_ext: ""
+            archive_ext: tar.gz
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            os_name: darwin
+            arch_name: arm64
+            binary_ext: ""
+            archive_ext: tar.gz
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            os_name: windows
+            arch_name: amd64
+            binary_ext: ".exe"
+            archive_ext: zip
+
+    env:
+      BINARY_NAME: switch
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # musl keeps the binary fully static, as CGO_ENABLED=0 did for the Go build.
+      - name: Install musl toolchain
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="snapshot-${GITHUB_SHA::7}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build binary
+        env:
+          # Replaces the Go build's -ldflags "-X main.version=..."
+          SWITCH_VERSION: ${{ steps.version.outputs.version }}
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Package archive
+        id: package
+        env:
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{ steps.version.outputs.version }}
+          OS_NAME: ${{ matrix.os_name }}
+          ARCH_NAME: ${{ matrix.arch_name }}
+          BINARY_EXT: ${{ matrix.binary_ext }}
+          ARCHIVE_EXT: ${{ matrix.archive_ext }}
+        run: |
+          ARCHIVE_NAME="${BINARY_NAME}-${VERSION}-${OS_NAME}-${ARCH_NAME}"
+          mkdir -p artifacts dist
+          cp "target/${TARGET}/release/${BINARY_NAME}${BINARY_EXT}" "dist/${BINARY_NAME}${BINARY_EXT}"
+          if [[ "${ARCHIVE_EXT}" == "zip" ]]; then
+            ARCHIVE_PATH="artifacts/${ARCHIVE_NAME}.zip"
+            (cd dist && 7z a "${GITHUB_WORKSPACE}/${ARCHIVE_PATH}" "${BINARY_NAME}${BINARY_EXT}")
+          else
+            ARCHIVE_PATH="artifacts/${ARCHIVE_NAME}.tar.gz"
+            tar -czf "${ARCHIVE_PATH}" -C dist "${BINARY_NAME}${BINARY_EXT}"
+          fi
+          echo "archive_path=${ARCHIVE_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.version }}-${{ matrix.os_name }}-${{ matrix.arch_name }}
+          path: ${{ steps.package.outputs.archive_path }}

@@ -1,0 +1,10 @@
+build/
+.claude/
+paste.md
+plan.md
+*.backup
+temp/
+target/
+lcov.info
+coverage.txt
+coverage-html/
