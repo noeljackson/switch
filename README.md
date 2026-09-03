@@ -1,196 +1,129 @@
-# Switch
+# switch
 
-Simple CLI to switch between multiple profiles for any app that uses a file or folder for its configuration (e.g., Codex, Claude, VSCode, Cursor, SSH, Git).
+Switch between configuration profiles for the tools you use — one command to
+swap accounts in Codex, Claude Code, VS Code, Cursor, SSH, Git, or anything
+else that keeps its settings in a file or folder.
 
-## Overview
+`switch` saves the live config as a named profile and restores it on demand.
+Profiles are plain copies on disk; nothing is encrypted, synced, or sent
+anywhere.
 
-Store multiple profiles and swap your active config with one command. Works for both single files (like `~/.codex/auth.json`) and entire folders (like `~/.vscode/User`).
+This is a Rust rewrite. The idea and the original command set came from
+[surajmandalcell/switch](https://github.com/surajmandalcell/switch) by Suraj
+Mandal, which was the inspiration for this project.
 
-## Download prebuilt binaries
-
-Continuous integration builds upload platform-specific archives for each successful run. You can download the latest artifacts here:
-
-- Latest CI build artifacts: [release-binaries workflow](https://github.com/surajmandalcell/switch/actions/workflows/release-binaries.yml)
-
-Artifact URLs are tied to individual runs, so open the most recent successful run to grab the archive for your platform. If you prefer to build locally, follow the setup instructions below.
-
-## TL;DR for quick usage
-
-```
-git clone https://github.com/surajmandalcell/switch && cd switch
-make install
-
-# login to one of your codex cli account and then
-switch add codex codex1
-
-# logut of current codex cli account and login to new one and then
-switch add codex codex2
-
-# now you can freely switch between them by just one, if you have more it behaves the same
-switch
-# or
-switch codex codex1
-```
-
-## Features
-
-- **App‑agnostic**: Works with any file/folder config
-- **Built‑in templates**: Codex, Claude, VSCode, Cursor, SSH, Git
-- **Wizard setup**: `switch add` guides detection and setup
-- **Cycle or target**: Cycle profiles or switch to a specific one
-- **Folder support**: Back up and restore whole config directories
-
-## Installation
-
-### From Source
+## Quick start
 
 ```bash
-git clone https://github.com/surajmandalcell/switch.git
+make install                  # builds and copies to /usr/local/bin
+
+# log in to account A, then capture it
+switch add codex work
+
+# log in to account B, then capture that too
+switch add codex personal
+
+# from now on, one command flips between them
+switch                        # cycle the default app
+switch codex work             # or name the profile
+```
+
+## Install
+
+### Prebuilt binaries
+
+Every tagged release (`v*`), and any manual run of the
+[release-binaries workflow](https://github.com/noeljackson/switch/actions/workflows/release-binaries.yml),
+uploads one archive per platform as a run artifact:
+
+| Platform | Archive |
+|---|---|
+| Linux x86_64 (static, musl) | `switch-<version>-linux-amd64.tar.gz` |
+| macOS Apple Silicon | `switch-<version>-darwin-arm64.tar.gz` |
+| Windows x86_64 | `switch-<version>-windows-amd64.zip` |
+
+Unpack and put `switch` (or `switch.exe`) somewhere on your `PATH`.
+
+### From source
+
+Requires Rust 1.74 or newer.
+
+```bash
+git clone https://github.com/noeljackson/switch
 cd switch
-cargo build --release
+
+cargo install --path .           # into ~/.cargo/bin
+# or
+make install                     # /usr/local/bin, uses sudo
+make install-user                # ~/bin
 ```
 
-The binary lands at `target/release/switch`. `make build` does the same and
-copies it to `./build/switch`.
-
-### Install Globally
-
-```bash
-# System-wide installation
-sudo cp ./build/switch /usr/local/bin/
-
-# Or install to user's ~/bin directory
-mkdir -p ~/bin
-cp ./build/switch ~/bin/
-echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc  # or ~/.bashrc
-source ~/.zshrc
-```
-
-### Cross-Platform Builds
-
-Add the target once with `rustup target add <target>`, then build:
-
-```bash
-# macOS
-cargo build --release --target aarch64-apple-darwin
-cargo build --release --target x86_64-apple-darwin
-
-# Linux (musl produces a fully static binary)
-cargo build --release --target x86_64-unknown-linux-musl
-cargo build --release --target aarch64-unknown-linux-musl
-
-# Windows
-cargo build --release --target x86_64-pc-windows-msvc
-```
-
-Rust links against the host platform's toolchain, so macOS and Windows targets
-need to be built on those platforms (or with a cross-compilation toolchain such
-as `cross`). The release workflow uses one runner per platform for that reason.
-
-## Quick Start
-
-### 1. Add your first app/profile
-
-```bash
-switch add
-# Wizard will auto-detect known apps or let you set up manually
-```
-
-### 2. Switch between profiles
-
-```bash
-# Cycle default app
-switch
-
-# Cycle specific app
-switch codex
-
-# Switch to a specific profile
-switch codex work
-
-# List apps and profiles
-switch list
-switch list codex
-```
+Other targets build with `cargo build --release --target <triple>` once the
+target is added with `rustup target add`. macOS and Windows binaries have to be
+built on those platforms (or with a cross toolchain); the release workflow uses
+one runner per platform for that reason.
 
 ## Usage
 
-### Commands
-
-- `switch`: Cycle the default app
-- `switch <app>`: Cycle profiles for an app
-- `switch <app> <profile>`: Switch to a profile
-- `switch add`: Launch setup wizard
-- `switch add <app>`: Add a profile to an app (prompts for name)
-- `switch add <app> <profile>`: Add current config as a profile
-- `switch rm <app> <profile>` (or `switch <app> rm <profile>`): Remove a profile and its backup
-- `switch rm <app>`: Remove an app and all its backups
-- `switch list` / `switch list <app>`: List apps or profiles
-- `switch default <app>`: Set default app
-- `switch config`: Open config file in editor
-- `switch <app> config`: Open config file in editor
-- `switch -h` / `--help`: Show usage
-- `switch -v` / `--version`: Print the short version
-
-Removals always ask for confirmation, and never touch the live config — only
-the stored profile backups.
-
-App and profile names cannot shadow a subcommand: an app called `list` or a
-profile called `config` could never be selected, so both are rejected up front.
-
-Errors and usage hints go to stderr; everything else goes to stdout.
-
-### Examples
-
-```bash
-# Quick account switching
-switch                    # Cycles to next account
-
-# Specific account switching
-switch codex work         # Switches to 'work' account
-switch codex personal     # Switches to 'personal' account
-
-# Account management
-switch add codex staging  # Saves current auth.json as 'staging'
-switch list codex         # Shows all accounts with current indicator
-switch rm codex staging   # Deletes the 'staging' backup (asks first)
-
-# Configuration management
-switch default codex      # Sets codex as the default app
-switch config             # Opens ~/.switch.toml in your editor
-switch codex config       # Alternative way to open config
+```
+switch                         Cycle through the default app's profiles
+switch <app>                   Cycle through an app's profiles
+switch <app> <profile>         Switch to a specific profile
+switch add                     Interactive setup wizard
+switch add <app>               Add a profile (prompts for the name)
+switch add <app> <profile>     Save the current config as a profile
+switch rm <app> <profile>      Remove a profile and its backup
+switch rm <app>                Remove an app and all of its backups
+switch list                    List apps and profiles
+switch list <app>              List one app's profiles
+switch default <app>           Set the default app
+switch config                  Open ~/.switch.toml in $EDITOR
+switch -h, --help              Usage
+switch -v, --version           Version
 ```
 
-## Where things are stored
+`switch <app> add|rm|list|config …` work too, for muscle memory that starts
+with the app name.
 
-- `~/.switch.toml` — which apps and profiles exist, and which is the default.
-- `~/.switch/profiles/<app>/<profile>` — backups for folder-based apps
-  (VSCode, Cursor, SSH, Antigravity). Created with owner-only permissions,
-  since profiles can contain credentials.
-- `<config path>.<profile>.switch` — backups for file-based apps, kept beside
-  the file they came from (`~/.codex/auth.json.work.switch`).
+Removals ask for confirmation and only ever delete stored backups; the live
+config is never touched. Errors and usage hints go to stderr, so
+`switch list > file` is clean.
 
-Backups for a folder are never written inside that folder: a backup nested in
-its own source cannot be copied or restored correctly, so `switch` refuses a
-`switch_pattern` that would do it.
+### Which profile am I on?
 
-## Which profile am I on?
+`switch` compares the live config against each stored profile instead of
+trusting a recorded name, so a config you edited by hand — or that the app
+rewrote — is still identified correctly. JSON compares regardless of key order;
+folders compare by their whole tree. If nothing matches, listings show the
+profile you last switched to, marked `(current, modified)`.
 
-`switch` works this out by comparing the live config against each stored
-profile, so a config edited by hand is still identified correctly. JSON files
-compare regardless of key order. If the live config matches no profile, listings
-show the last profile you switched to marked `(modified)`.
+Cycling starts from the detected profile, so it always advances to the next
+one.
 
-## Colours
+## Built-in templates
 
-Colour is used when output is a terminal. It is disabled when output is piped or
-redirected, when `NO_COLOR` is set, and enabled anyway by `CLICOLOR_FORCE=1`.
+`switch add` detects these automatically. Each captures either a single file or
+an entire folder.
+
+| App | What is captured | Backups |
+|---|---|---|
+| `codex` | `~/.codex/auth.json` | beside the file |
+| `claude` | `~/.claude/config.json` | beside the file |
+| `claudecode` | `~/.claude/settings.json` | beside the file |
+| `git` | `~/.gitconfig` | beside the file |
+| `vscode` | `~/.vscode/User` (folder) | `~/.switch/profiles/vscode/` |
+| `cursor` | `~/.cursor` (folder) | `~/.switch/profiles/cursor/` |
+| `ssh` | `~/.ssh` (folder) | `~/.switch/profiles/ssh/` |
+| `antigravity` | `~/Library/Application Support/Antigravity` (folder) | `~/.switch/profiles/antigravity/` |
+
+Where an app has more than one conventional location (VS Code and Cursor on
+macOS, Antigravity on Linux) the wizard uses whichever it finds. Anything not
+listed can be set up through the wizard's manual option: give it a path and a
+profile name and it works the same way.
 
 ## Configuration
 
-Config is stored at `~/.switch.toml`.
-
-Example:
+Everything lives in `~/.switch.toml`:
 
 ```toml
 [default]
@@ -198,52 +131,65 @@ config = "codex"
 
 [apps.codex]
 current = "work"
-accounts = ["work", "personal"]
+accounts = ["personal", "work"]
 auth_path = "~/.codex/auth.json"
 switch_pattern = "{auth_path}.{name}.switch"
 
-[apps.vscode]
-current = "dev"
-accounts = ["dev", "personal"]
-auth_path = "~/.vscode/User"
-switch_pattern = "~/.switch/profiles/vscode/{name}"
+[apps.ssh]
+current = "home"
+accounts = ["home", "work"]
+auth_path = "~/.ssh"
+switch_pattern = "~/.switch/profiles/ssh/{name}"
 ```
 
-`switch_pattern` accepts two placeholders: `{auth_path}`, the expanded config
-path, and `{name}`, the profile name.
+`switch_pattern` decides where a profile's backup goes. It accepts two
+placeholders: `{auth_path}`, the expanded config path, and `{name}`, the
+profile name. A leading `~` in any path expands to your home directory.
+
+A backup can never live inside the folder it backs up — `switch` refuses such a
+pattern rather than copy a directory into itself.
+
+App and profile names cannot be the same as a subcommand (`list`, `add`, `rm`,
+and so on), since they could never be selected; both are checked when created.
+
+## Where things are stored
+
+- `~/.switch.toml` — which apps and profiles exist, and the default app.
+- `<config path>.<profile>.switch` — backups of file-based configs, beside the
+  original.
+- `~/.switch/profiles/<app>/<profile>` — backups of folder-based configs.
+  `~/.switch` is created with owner-only permissions, since profiles can hold
+  credentials.
+
+Backups are exact copies, permissions included. Restoring a profile replaces the
+live config outright rather than merging into it, so a profile that lacks some
+file does not inherit it from the previous one. Writes are staged and renamed
+into place, so an interrupted run leaves either the old content or the new,
+never a mix.
+
+## Colour and environment
+
+- Colour is on when stdout is a terminal and off when piped. `NO_COLOR` turns
+  it off; `CLICOLOR_FORCE=1` turns it on regardless.
+- `switch config` opens the config in `$EDITOR`, falling back to `nano`, `vi`,
+  `vim`, `code`, or `gedit`, whichever is found first.
+- `HOME` (`USERPROFILE` on Windows) decides where `~` points.
 
 ## Development
 
-### Testing
-
 ```bash
-make test
+cargo test                                  # unit + integration tests
+cargo clippy --all-targets -- -D warnings
+cargo fmt --all --check
+make dev                                    # all of the above, then a release build
 ```
 
-### Building
+CI runs the same checks on Linux, macOS, and Windows. The module layout and the
+invariants the code depends on are in [AGENTS.md](AGENTS.md).
 
-```bash
-cargo build --release
-```
-
-`make dev` runs formatting, lints, tests and a release build in one go.
-
-### Contributing
-
-PRs welcome.
-
-## Requirements
-
-- Rust 1.74 or newer (stable)
-- Write access to your home directory
+`switch -v` prints the version stamped at build time: the git commit or tag,
+or `SWITCH_VERSION` if that was set when building.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Author
-
-**Suraj Mandal**
-
-- GitHub: [@surajmandalcell](https://github.com/surajmandalcell)
-- Project: [github.com/surajmandalcell/switch](https://github.com/surajmandalcell/switch)
+MIT — see [LICENSE](LICENSE).
